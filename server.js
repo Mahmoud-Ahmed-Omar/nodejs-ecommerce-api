@@ -1,45 +1,33 @@
 const express = require("express");
-const dotenv = require("dotenv").config();
 const morgan = require("morgan");
-const mongoose = require("mongoose");
-
-mongoose
-  .connect(process.env.MONGODB_DB)
-  .then((connection) => {
-    console.log(`Database Connected ${connection.connection.host}`);
-  })
-  .catch((error) => {
-    console.log(error);
-    process.exit(1);
-  });
+const dbConnection = require("./config/database");
+const ApiError = require("./utils/ApiError");
+const globalError = require("./middlewares/ApiError");
+const CategoryRouter = require("./routes/CategoryRoutes");
+const {
+  StoreCategory,
+  GetCategory,
+  GetCategoryById,
+  UpdateCategory,
+  DeleteCategory,
+} = require("./services/CategoryService");
+dbConnection();
 
 const app = express();
 app.use(express.json());
 if (process.env.NODE_ENV === "development") app.use(morgan("dev"));
 
-// 1 - Create a Schema
-const CategorySchema = new mongoose.Schema({
-  name: String,
-});
+app.post("/api/v1/categories", StoreCategory);
+app.get("/api/v1/categories", GetCategory);
+app.get("/api/v1/categories/:id", GetCategoryById);
+app.put("/api/v1/categories/:id", UpdateCategory);
+app.delete("/api/v1/categories/:id", DeleteCategory);
 
-// 2- Create a Model
-const CategoryModel = mongoose.model("Category", CategorySchema);
-
-app.get("/", (req, res) => {
-  res.send("First API");
+app.all("*", (req, res, next) => {
+  next(new ApiError(`Not Found! ${req.originalUrl}`, 404));
 });
-
-app.post("/", (req, res) => {
-  const name = req.body.name;
-  const Category = new CategoryModel({ name });
-  Category.save()
-    .then((document) => {
-      res.json(document);
-    })
-    .catch((error) => {
-      res.json(error);
-    });
-});
+// Global Error handling middleware
+app.use(globalError);
 
 app.listen(process.env.PORT, () => {
   console.log(`App Running on port ${process.env.PORT}`);
